@@ -1,0 +1,183 @@
+module compressor_block_tb;
+
+    // Signals
+    reg         clk;
+    reg         rst;
+    reg         start;
+    reg         last_block;
+    reg  [31:0] Wt;
+    wire [255:0] hash_out;
+    wire         hash_valid;
+
+    compressor_block dut (
+        .clk         (clk),
+        .rst         (rst),
+        .start       (start),
+        .last_block  (last_block),
+        .Wt          (Wt),
+        .hash_out    (hash_out),
+        .hash_valid  (hash_valid)
+    );
+
+    initial clk = 1'b0;
+    always #5 clk = ~clk;
+
+    // Message schedule W[0..63] for SHA-256("abc")
+    reg [31:0] W_abc [0:63];
+    integer    i;
+
+    initial begin
+        W_abc[0]  = 32'h61626380; W_abc[1]  = 32'h00000000;
+        W_abc[2]  = 32'h00000000; W_abc[3]  = 32'h00000000;
+        W_abc[4]  = 32'h00000000; W_abc[5]  = 32'h00000000;
+        W_abc[6]  = 32'h00000000; W_abc[7]  = 32'h00000000;
+        W_abc[8]  = 32'h00000000; W_abc[9]  = 32'h00000000;
+        W_abc[10] = 32'h00000000; W_abc[11] = 32'h00000000;
+        W_abc[12] = 32'h00000000; W_abc[13] = 32'h00000000;
+        W_abc[14] = 32'h00000000; W_abc[15] = 32'h00000018;
+
+        W_abc[16] = 32'h61626380; W_abc[17] = 32'h000f0000;
+        W_abc[18] = 32'h7da86405; W_abc[19] = 32'h600003c6;
+        W_abc[20] = 32'h3e9d7b78; W_abc[21] = 32'h0183fc00;
+        W_abc[22] = 32'h12dcbfdb; W_abc[23] = 32'he2e2c38e;
+        W_abc[24] = 32'hc8215c1a; W_abc[25] = 32'hb73679a2;
+        W_abc[26] = 32'he5bc3909; W_abc[27] = 32'h32663c5b;
+        W_abc[28] = 32'h9d209d67; W_abc[29] = 32'hec8726cb;
+        W_abc[30] = 32'h702138a4; W_abc[31] = 32'hd3b7973b;
+        W_abc[32] = 32'h93f5997f; W_abc[33] = 32'h3b68ba73;
+        W_abc[34] = 32'haff4ffc1; W_abc[35] = 32'hf10a5c62;
+        W_abc[36] = 32'h0a8b3996; W_abc[37] = 32'h72af830a;
+        W_abc[38] = 32'h9409e33e; W_abc[39] = 32'h24641522;
+        W_abc[40] = 32'h9f47bf94; W_abc[41] = 32'hf0a64f5a;
+        W_abc[42] = 32'h3e246a79; W_abc[43] = 32'h27333ba3;
+        W_abc[44] = 32'h0c4763f2; W_abc[45] = 32'h840abf27;
+        W_abc[46] = 32'h7a290d5d; W_abc[47] = 32'h065c43da;
+        W_abc[48] = 32'hfb3e89cb; W_abc[49] = 32'hcc7617db;
+        W_abc[50] = 32'hb9e66c34; W_abc[51] = 32'ha9993667;
+        W_abc[52] = 32'h84badedd; W_abc[53] = 32'hc21462bc;
+        W_abc[54] = 32'h1487472c; W_abc[55] = 32'hb20f7a99;
+        W_abc[56] = 32'hef57b9cd; W_abc[57] = 32'hebe6b238;
+        W_abc[58] = 32'h9fe3095e; W_abc[59] = 32'h78bc8d4b;
+        W_abc[60] = 32'ha43fcf15; W_abc[61] = 32'h668b2ff8;
+        W_abc[62] = 32'heeaba2cc; W_abc[63] = 32'h12b1edeb;
+    end
+
+    // Golden reference: NIST SHA-256("abc")
+    localparam [31:0]  ROUND0_A_EXP = 32'h5d6aebcd;
+    localparam [31:0]  ROUND0_E_EXP = 32'hfa2a4622;
+    localparam [255:0] HASH_EXP      = 256'hba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad;
+
+    // Timeout counter (pure Verilog, no fork/join)
+    integer timeout_cnt;
+    reg     timeout_flag;
+
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            timeout_cnt <= 0;
+            timeout_flag <= 1'b0;
+        end else if (hash_valid) begin
+            timeout_flag <= 1'b0;  // stop counting once done
+        end else if (timeout_cnt < 200) begin
+            timeout_cnt <= timeout_cnt + 1;
+        end else begin
+            timeout_flag <= 1'b1;
+        end
+    end
+
+    // Main test sequence
+    initial begin
+        $display(" SHA-256 Compressor Block Testbench");
+        $display(" Message: \"abc\" (single 512-bit block)");
+
+        // Initialize
+        rst        = 1'b1;
+        start      = 1'b0;
+        last_block = 1'b0;
+        Wt         = 32'd0;
+
+        // Hold reset for 2 cycles
+        @(posedge clk);
+        @(posedge clk);
+        #1 rst = 1'b0;
+
+        // Cycle 0: Assert start
+        @(posedge clk);
+        #1 begin
+            start      = 1'b1;
+            last_block = 1'b1;
+            Wt         = 32'd0;
+        end
+
+        // Cycle 1: Present W[0]
+        @(posedge clk);
+        #1 begin
+            start = 1'b0;
+            Wt    = W_abc[0];
+        end
+
+        // Cycle 2: Check Round 0 result
+        @(posedge clk);
+        #1 begin
+            $display("\n--- After Round 0 ---");
+            $display("  dut.A = %h  (expected %h)", dut.A, ROUND0_A_EXP);
+            $display("  dut.E = %h  (expected %h)", dut.E, ROUND0_E_EXP);
+
+            if (dut.A === ROUND0_A_EXP && dut.E === ROUND0_E_EXP)
+                $display("  Round 0: PASS");
+            else begin
+                $display("  Round 0: FAIL");
+                if (dut.A !== ROUND0_A_EXP)
+                    $display("    -> A mismatch (check SIG0, MAJ, CSkA chain)");
+                if (dut.E !== ROUND0_E_EXP)
+                    $display("    -> E mismatch (check SIG1, CH, CSkA chain or MUX M3)");
+            end
+
+            Wt = W_abc[1];
+        end
+
+        // Feed W[2]..W[63]
+        for (i = 2; i < 64; i = i + 1) begin
+            @(posedge clk);
+            #1 Wt = W_abc[i];
+        end
+
+        // Dummy cycle
+        @(posedge clk);
+        #1 Wt = 32'd0;
+
+        // Wait for hash_valid or timeout
+        wait (hash_valid === 1'b1 || timeout_flag === 1'b1);
+
+        if (timeout_flag === 1'b1 && hash_valid !== 1'b1) begin
+            $display("\n*** ERROR: Timeout - hash_valid never asserted ***");
+            $display("    Check DUT round counter or last_block logic.");
+            $finish;
+        end
+
+        #1;  // settling delay
+
+        // Verify final hash
+        $display("\n--- Final Hash ---");
+        $display("  %h %h %h %h",
+                 hash_out[255:224], hash_out[223:192],
+                 hash_out[191:160], hash_out[159:128]);
+        $display("  %h %h %h %h",
+                 hash_out[127:96],  hash_out[95:64],
+                 hash_out[63:32],   hash_out[31:0]);
+
+        if (hash_out === HASH_EXP) begin
+            $display("\n*** PASS: Hash matches NIST reference exactly ***");
+        end else begin
+            $display("\n*** FAIL: Hash mismatch ***");
+            $display("  Expected:");
+            $display("  %h %h %h %h",
+                     HASH_EXP[255:224], HASH_EXP[223:192],
+                     HASH_EXP[191:160], HASH_EXP[159:128]);
+            $display("  %h %h %h %h",
+                     HASH_EXP[127:96],  HASH_EXP[95:64],
+                     HASH_EXP[63:32],   HASH_EXP[31:0]);
+        end
+
+        #20;
+        $finish;
+    end
