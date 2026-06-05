@@ -1,0 +1,67 @@
+module expander_block_tb();
+
+    reg clk, rst, load;
+    reg [511:0] message;
+    wire [31:0] wt;
+    
+    // Array to store and access all 64 words
+    reg [31:0] W [0:63];
+
+    // Instantiate the Unit Under Test (UUT)
+    expander_block uut (
+        .clk(clk), 
+        .rst(rst), 
+        .load(load), 
+        .message(message), 
+        .wt(wt)
+    );
+
+    // Clock generation: 10 ns period
+    always #5 clk = ~clk;
+
+    integer i;
+
+    initial begin
+        // Initialize Inputs
+        clk = 0;
+        rst = 0;
+        load = 0;
+        message = 512'b0;
+
+        // Apply Reset
+        rst = 1;
+        repeat(3) @(posedge clk);
+        rst = 0;
+        @(posedge clk);
+
+        // Load the 512-bit padded message (SHA-256 "abc")
+        message = {
+            32'h61626380, 32'h00000000, 32'h00000000, 32'h00000000,
+            32'h00000000, 32'h00000000, 32'h00000000, 32'h00000000,
+            32'h00000000, 32'h00000000, 32'h00000000, 32'h00000000,
+            32'h00000000, 32'h00000000, 32'h00000000, 32'h00000018
+        };
+
+        load = 1;
+        @(posedge clk);
+        #1; // Allow non-blocking assignments to settle
+        load = 0;
+
+        // Capture all 64 words into the W array
+        for (i = 0; i < 64; i = i + 1) begin
+            @(posedge clk);
+            #1; // Small delay so 'wt' updates before we capture it
+            W[i] = wt; 
+        end
+        
+        // Now display all 64 accessed words
+        $display("");
+        $display("     Successfully Accessed All 64 Expanded Words    ");
+        for (i = 0; i < 64; i = i + 1) begin
+            $display("W[%02d] = 0x%h", i, W[i]);
+        end
+
+        #50;
+    end
+
+endmodule
