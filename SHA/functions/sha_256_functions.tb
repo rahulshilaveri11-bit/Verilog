@@ -1,0 +1,281 @@
+module sha_256_functions_tb(
+
+    );
+    // Include the header file
+    `include "sha_256_functions.vh"
+
+    // Declare registers matching header file parameter names
+    reg [31:0] x, s, e, f, g, a, b, c, w;
+    reg [4:0]  n;
+    reg [31:0] result;
+
+    // Pass / Fail counters  
+    integer pass_count;
+    integer fail_count;
+
+    // Task: compare got vs expected, print PASS or FAIL
+    task check_result;
+        input [200:0] test_name;
+        input [31:0]  got;
+        input [31:0]  expected;
+        begin
+            if (got === expected) begin
+                $display("  PASS | %-25s | got: %h", test_name, got);
+                pass_count = pass_count + 1;
+            end else begin
+                $display("  FAIL | %-25s | got: %h | expected: %h",
+                          test_name, got, expected);
+                fail_count = fail_count + 1;
+            end
+        end
+    endtask
+
+    // MAIN TEST
+    initial begin
+      
+
+        pass_count = 0;
+        fail_count = 0;
+
+        $display("  SHA-256 All Functions Testbench");
+        
+
+
+        // TEST 1: ROTR(x, n)
+        $display("\n--- TEST 1: ROTR(x, n) ---");
+
+        #10; // Wait 10ns before applying inputs
+        x = 32'h12345678; n = 5'd4;
+        result = ROTR(x, n);
+        check_result("ROTR(12345678, 4)", result, 32'h81234567);
+
+        #10;
+        x = 32'h00000001; n = 5'd1;
+        result = ROTR(x, n);
+        check_result("ROTR(00000001, 1)", result, 32'h80000000);
+
+        #10;
+        x = 32'h80000000; n = 5'd1;
+        result = ROTR(x, n);
+        check_result("ROTR(80000000, 1)", result, 32'h40000000);
+
+        #10;
+        x = 32'hAABBCCDD; n = 5'd8;
+        result = ROTR(x, n);
+        check_result("ROTR(AABBCCDD, 8)", result, 32'hDDAABBCC);
+
+        #10;
+        x = 32'hFFFFFFFF; n = 5'd7;
+        result = ROTR(x, n);
+        check_result("ROTR(FFFFFFFF, 7)", result, 32'hFFFFFFFF);
+
+        #10;
+        x = 32'h6a09e667; n = 5'd2;
+        result = ROTR(x, n);
+        check_result("ROTR(6a09e667, 2)", result, 32'hda827999);
+
+        // TEST 2: SHR(s, n)
+        $display("\n--- TEST 2: SHR(s, n) ---");
+
+        #10;
+        s = 32'h12345678; n = 5'd4;
+        result = SHR(s, n);
+        check_result("SHR(12345678, 4)", result, 32'h01234567);
+
+        #10;
+        s = 32'h00000001; n = 5'd1;
+        result = SHR(s, n);
+        check_result("SHR(00000001, 1)", result, 32'h00000000);
+
+        #10;
+        s = 32'h80000000; n = 5'd1;
+        result = SHR(s, n);
+        check_result("SHR(80000000, 1)", result, 32'h40000000);
+
+        #10;
+        s = 32'hFFFFFFFF; n = 5'd3;
+        result = SHR(s, n);
+        check_result("SHR(FFFFFFFF, 3)", result, 32'h1FFFFFFF);
+
+        #10;
+        s = 32'hFFFFFFFF; n = 5'd10;
+        result = SHR(s, n);
+        check_result("SHR(FFFFFFFF,10)", result, 32'h003FFFFF);
+
+        // TEST 3: CHOOSE(e, f, g)
+        $display("\n--- TEST 3: CHOOSE(e, f, g) ---");
+
+        #10;
+        e = 32'h12345678; f = 32'hFFFFFFFF; g = 32'hAAAAAAAA;
+        result = choose(e, f, g);
+        check_result("CH(12345678,FF,AA)", result, 32'hBABEFEFA);
+
+        #10;
+        e = 32'hFFFFFFFF; f = 32'hAAAAAAAA; g = 32'h55555555;
+        result = choose(e, f, g);
+        check_result("CH(FFFFFFFF,AA,55)", result, 32'hAAAAAAAA);
+
+        #10;
+        e = 32'h00000000; f = 32'hAAAAAAAA; g = 32'h55555555;
+        result = choose(e, f, g);
+        check_result("CH(00000000,AA,55)", result, 32'h55555555);
+
+        #10;
+        e = 32'h510e527f; f = 32'h9b05688c; g = 32'h1f83d9ab;
+        result = choose(e, f, g);
+        check_result("CH(510e527f,9b05,1f83)", result, 32'h1f85c98c);
+
+        // TEST 4: MAJORITY(a, b, c)
+        $display("\n--- TEST 4: MAJORITY(a, b, c) ---");
+
+        #10;
+        a = 32'h12345678; b = 32'hFFFFFFFF; c = 32'hAAAAAAAA;
+        result = majority(a, b, c);
+        check_result("MAJ(12345678,FF,AA)", result, 32'hBABEFEFA);
+
+        #10;
+        a = 32'hFFFFFFFF; b = 32'hFFFFFFFF; c = 32'h00000000;
+        result = majority(a, b, c);
+        check_result("MAJ(FF,FF,00)", result, 32'hFFFFFFFF);
+
+        #10;
+        a = 32'hFFFFFFFF; b = 32'h00000000; c = 32'h00000000;
+        result = majority(a, b, c);
+        check_result("MAJ(FF,00,00)", result, 32'h00000000);
+
+        #10;
+        a = 32'h6a09e667; b = 32'hbb67ae85; c = 32'h3c6ef372;
+        result = majority(a, b, c);
+        check_result("MAJ(6a09,bb67,3c6e)", result, 32'h3a6fe667);
+
+        // TEST 5: SIG0(a)
+        $display("\n--- TEST 5: SIG0(a) ---");
+
+        #10;
+        a = 32'h22222222;
+        result = SIG0(a);
+        check_result("SIG0(22222222)", result, 32'h11111111);
+
+        #10;
+        a = 32'h6a09e667;
+        result = SIG0(a);
+        check_result("SIG0(6a09e667)", result, 32'hce20b47e);
+
+        #10;
+        a = 32'h00000000;
+        result = SIG0(a);
+        check_result("SIG0(00000000)", result, 32'h00000000);
+
+        #10;
+        a = 32'hFFFFFFFF;
+        result = SIG0(a);
+        check_result("SIG0(FFFFFFFF)", result, 32'hFFFFFFFF);
+
+        // TEST 6: SIG1(e)
+        $display("\n--- TEST 6: SIG1(e) ---");
+
+        #10;
+        e = 32'hBBBBBBBB;
+        result = SIG1(e);
+        check_result("SIG1(BBBBBBBB)", result, 32'h44444444);
+
+        #10;
+        e = 32'h510e527f;
+        result = SIG1(e);
+        check_result("SIG1(510e527f)", result, 32'h3587272b);
+
+        #10;
+        e = 32'h00000000;
+        result = SIG1(e);
+        check_result("SIG1(00000000)", result, 32'h00000000);
+
+        #10;
+        e = 32'hFFFFFFFF;
+        result = SIG1(e);
+        check_result("SIG1(FFFFFFFF)", result, 32'hFFFFFFFF);
+
+        // TEST 7: sig0(w)
+        $display("\n--- TEST 7: sig0(w) ---");
+
+        #10;
+        w = 32'hCCCCCCCC;
+        result = sig0(w);
+        check_result("sig0(CCCCCCCC)", result, 32'hb3333333);
+
+        #10;
+        w = 32'h62636400;
+        result = sig0(w);
+        check_result("sig0(62636400)", result, 32'hd588b2d0);
+
+        #10;
+        w = 32'h00000000;
+        result = sig0(w);
+        check_result("sig0(00000000)", result, 32'h00000000);
+
+        #10;
+        w = 32'hFFFFFFFF;
+        result = sig0(w);
+        check_result("sig0(FFFFFFFF)", result, 32'h1fffffff);
+
+        // TEST 8: sig1(w)
+        $display("\n--- TEST 8: sig1(w) ---");
+
+        #10;
+        w = 32'h55555555;
+        result = sig1(w);
+        check_result("sig1(55555555)", result, 32'h00155555);
+
+        #10;
+        w = 32'h62636400;
+        result = sig1(w);
+        check_result("sig1(62636400)", result, 32'hde98a5a4);
+
+        #10;
+        w = 32'h00000000;
+        result = sig1(w);
+        check_result("sig1(00000000)", result, 32'h00000000);
+
+        #10;
+        w = 32'hFFFFFFFF;
+        result = sig1(w);
+        check_result("sig1(FFFFFFFF)", result, 32'h003fffff);
+
+        // CROSS CHECK
+        $display("\n--- CROSS CHECK: lowercase != UPPERCASE ---");
+
+        #10;
+        a = 32'h6a09e667;
+        w = 32'h6a09e667;
+        if (sig0(w) !== SIG0(a)) begin
+            $display("  PASS | sig0 != SIG0 on same input - correct");
+            pass_count = pass_count + 1;
+        end else begin
+            $display("  FAIL | sig0 == SIG0 - these must be different!");
+            fail_count = fail_count + 1;
+        end
+
+        #10;
+        e = 32'h510e527f;
+        w = 32'h510e527f;
+        if (sig1(w) !== SIG1(e)) begin
+            $display("  PASS | sig1 != SIG1 on same input - correct");
+            pass_count = pass_count + 1;
+        end else begin
+            $display("  FAIL | sig1 == SIG1 - these must be different!");
+            fail_count = fail_count + 1;
+        end
+
+        // FINAL SCORE
+        #10;
+        $display("  RESULT: %0d PASSED   %0d FAILED",
+                  pass_count, fail_count);
+        if (fail_count == 0)
+            $display("  ALL PASSED - move on to expander.v");
+        else
+            $display("  FIX THE FAILURES BEFORE MOVING FORWARD");
+
+        #10;
+        $finish;
+    end
+
+endmodule
