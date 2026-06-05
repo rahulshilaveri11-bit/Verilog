@@ -1,0 +1,156 @@
+module SHAtop_module_tb();
+
+    reg         clk;
+    reg         rst;
+    reg         valid_input;
+    reg  [7:0]  byte_in;
+    reg         last_byte;
+    wire        busy;
+    wire [255:0] hash_out;
+    wire         hash_valid;
+
+    SHAtop_module dut(
+        .clk        (clk),
+        .rst        (rst),
+        .valid_input(valid_input),
+        .byte_in    (byte_in),
+        .last_byte  (last_byte),
+        .busy       (busy),
+        .hash_out   (hash_out),
+        .hash_valid (hash_valid)
+    );
+
+    // Clock: ~171 MHz  (5.85 ns period)
+    initial clk = 1'b0;
+    always  #2.925 clk = ~clk;
+
+    // TASK: send one byte
+    task send_byte;
+        input [7:0] data;
+        input       is_last;
+        begin
+            @(posedge clk);
+            #1;
+            byte_in      <= data;
+            valid_input  <= 1'b1;
+            last_byte    <= is_last;
+            @(posedge clk);
+            #1;
+            valid_input  <= 1'b0;
+            last_byte    <= 1'b0;
+        end
+    endtask
+
+    // TASK: send a string byte-by-byte
+    //   string_data : up to 128 bytes packed big-endian in 1024 bits
+    //   len         : number of valid bytes (1-128)
+    task send_string;
+        input [1023:0] string_data;
+        input [7:0]    len;
+        integer        idx;
+        begin
+            for (idx = 0; idx < len; idx = idx + 1) begin
+                // byte 0 is the MSB of the 1024-bit vector
+                send_byte(string_data[(len-1-idx)*8 +: 8], (idx == len-1));
+            end
+        end
+    endtask
+
+    // TASK: wait for hash_valid, display and compare result
+    task wait_for_hash;
+        input [255:0] expected;
+        begin
+            @(posedge hash_valid);
+            #1;
+            $display("Time=%0t : hash_valid asserted", $time);
+            $display("  Got     : %064h", hash_out);
+            $display("  Expected: %064h", expected);
+            if (hash_out === expected)
+                $display("  --> PASS");
+            else
+                $display("  --> FAIL  *** MISMATCH ***");
+            // Wait until busy deasserts before sending next message
+            @(negedge busy);
+            #20;
+        end
+    endtask
+
+    // Main test sequence
+    initial begin
+        // Initialise
+        rst         = 1'b1;
+        valid_input = 1'b0;
+        byte_in     = 8'h00;
+        last_byte   = 1'b0;
+
+        // Hold reset for 10 clock edges
+        repeat (10) @(posedge clk);
+        #1 rst = 1'b0;
+        repeat (2) @(posedge clk);
+
+        // -----------------------------------------------------------
+        // TEST 1: SHA-256("abc")
+        //   Expected: ba7816bf 8f01cfea 414140de 5dae2223
+        //             b00361a3 96177a9c b410ff61 f20015ad
+        // -----------------------------------------------------------
+        $display("TEST 1: SHA-256(\"abc\")");
+        $display("Expected: ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+
+        send_string("abc", 8'd3);
+        wait_for_hash(256'hba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad);
+
+        // -----------------------------------------------------------
+        // TEST 2: 55-byte string (fits in one 512-bit block)
+        //   SHA-256("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")
+        //   Expected: 248d6a61 d20638b8 e5c02693 0c3e6039
+        //             a33ce459 64ff2167 f6ecedd4 19db06c1
+        // -----------------------------------------------------------
+        $display("TEST 2: SHA-256(55-byte string)");
+        $display("Expected: 248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
+
+        send_string("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", 8'd56);
+        wait_for_hash(256'h248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1);
+
+        // -----------------------------------------------------------
+        // TEST 3: 112-byte string (requires TWO 512-bit blocks)
+        //   Only the first 128 chars can be sent via the 1024-bit task.
+        //   112 bytes = 896 bits, fits within the 1024-bit task width.
+        //   SHA-256("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu")
+        //   Expected: cf5b16a7 78af8380 036ce59e 7b049237
+        //             0b249b11 e8f07a51 afac4503 7afee9d1
+        // -----------------------------------------------------------
+        $display("TEST 3: SHA-256(112-byte string, 2 blocks)");
+        $display("Expected: cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1");
+
+        // 112 bytes sent 56 at a time (two send_string calls, first not-last)
+        // First 56 bytes:
+        begin : test3_send
+            integer b;
+            reg [1023:0] msg_part1;
+            reg [1023:0] msg_part2;
+            msg_part1 = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmn";  // 56 bytes
+            msg_part2 = "hijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu";  // 56 bytes
+
+            // Send first 56 bytes (not last)
+            for (b = 0; b < 56; b = b + 1)
+                send_byte(msg_part1[(55-b)*8 +: 8], 1'b0);
+
+            // Send last 56 bytes (last byte is last)
+            for (b = 0; b < 56; b = b + 1)
+                send_byte(msg_part2[(55-b)*8 +: 8], (b == 55));
+        end
+        wait_for_hash(256'hcf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1);
+
+        $display("ALL TESTS COMPLETED");
+        #100;
+        $finish;
+    end
+
+    // Timeout watchdog: 500 us
+    initial begin
+        #500000;
+        $display("TIMEOUT: Simulation did not finish in 500us!");
+        $finish;
+    end
+
+endmodule
