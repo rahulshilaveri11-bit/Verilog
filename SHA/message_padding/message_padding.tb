@@ -1,0 +1,248 @@
+module message_padding_tb(
+
+    );
+    reg        clk, rst;
+    reg        valid_input, last_byte;
+    reg  [7:0] byte_in;
+    wire [511:0] block_out;
+    wire         block_valid;
+    wire         last_block;
+
+    message_padding DUT(
+        .clk(clk), .rst(rst),
+        .valid_input(valid_input),
+        .byte_in(byte_in),
+        .last_byte(last_byte),
+        .block_out(block_out),
+        .block_valid(block_valid),
+        .last_block(last_block)
+    );
+
+    always #5 clk = ~clk;
+
+    integer pass_count, fail_count;
+    integer i, j;
+
+    // Array to unpack 512-bit block into 16 words
+    reg [31:0] W [0:15];
+    integer block_num;
+
+    // Task: send one byte
+    task send_byte;
+        input [7:0] data;
+        input       is_last;
+        begin
+            @(posedge clk); #1;
+            valid_input = 1;
+            byte_in     = data;
+            last_byte   = is_last;
+            @(posedge clk); #1;
+            valid_input = 0;
+            last_byte   = 0;
+        end
+    endtask
+
+    // Task: unpack and display a 512-bit block
+    task display_block;
+        input [511:0] block_data;
+        input         is_last;
+        begin
+            for (j = 0; j < 16; j = j + 1) begin
+                W[j] = block_data[511 - (j*32) -: 32];
+            end
+
+            $display("");
+            if (is_last) begin
+                $display("     BLOCK %0d (LAST BLOCK)", block_num);
+          end  else
+                $display("     BLOCK %0d", block_num);
+
+            for (j = 0; j < 16; j = j + 1) begin
+                $display("W[%02d] = 0x%h", j, W[j]);
+            end
+        end
+    endtask
+
+    // Task: wait for block and verify W[0], W[15], last_block
+    task check_block;
+        input [31:0]  exp_w0;
+        input [31:0]  exp_w15;
+        input         exp_last;
+        input [255:0] name;
+        begin
+            wait(block_valid == 1'b1);
+            @(posedge clk); #1;
+
+            block_num = block_num + 1;
+            display_block(block_out, last_block);
+
+            if (block_out[511:480] === exp_w0   &&
+                block_out[31:0]    === exp_w15   &&
+                last_block         === exp_last) begin
+                $display("PASS | %s", name);
+                pass_count = pass_count + 1;
+            end else begin
+                $display("FAIL | %s", name);
+                $display("     W[0]  got=%h  exp=%h", block_out[511:480], exp_w0);
+                $display("     W[15] got=%h  exp=%h", block_out[31:0], exp_w15);
+                $display("     last  got=%b  exp=%b", last_block, exp_last);
+                fail_count = fail_count + 1;
+            end
+        end
+    endtask
+
+    initial begin
+        
+        $dumpvars(0, message_padding_tb);
+
+        clk = 0; rst = 1;
+        valid_input = 0;
+        byte_in = 0;
+        last_byte = 0;
+        pass_count = 0;
+        fail_count = 0;
+        block_num = 0;
+
+        #15; rst = 0; #5;
+
+        $display("     Message Padding Testbench");
+
+        // TEST 1: "abc" - 3 bytes - 1 block
+        // W[0]  = 61626380, W[15] = 00000018
+        $display("\n--- TEST 1: abc (3 bytes, 1 block) ---");
+        send_byte(8'h61, 0);   // a
+        send_byte(8'h62, 0);   // b
+        send_byte(8'h63, 1);   // c last
+        check_block(32'h61626380, 32'h00000018, 1'b1, "abc 3 bytes");
+
+        #30;
+
+        // TEST 2: single byte 0xAB - 1 block
+        // W[0]  = AB800000, W[15] = 00000008
+        $display("\n--- TEST 2: single byte 0xAB ---");
+        send_byte(8'hAB, 1);
+        check_block(32'hAB800000, 32'h00000008, 1'b1, "single byte AB");
+
+        #30;
+
+        // TEST 3: 55 bytes of 0x41 ('A') - 1 block only
+        // 55 bytes = 440 bits = 0x1B8
+        // 0x80 lands at byte 55, length fits at bytes 56-63
+        // W[0]  = 41414141, W[13] = 41414180, W[15] = 000001B8
+        $display("\n--- TEST 3: 55 bytes (fits in 1 block) ---");
+        for (i = 0; i < 55; i = i + 1)
+            send_byte(8'h41, (i == 54));
+
+        check_block(32'h41414141, 32'h000001B8, 1'b1, "55-byte single block");
+
+        #30;
+
+        // TEST 4: 56 bytes of 0x42 ('B') - 2 blocks
+        // 56 bytes = 448 bits = 0x1C0
+        // Block 1: message + 0x80 at byte 56 + zeros to end
+        // Block 2: zeros + length
+        $display("\n--- TEST 4: 56 bytes (2 blocks) ---");
+        for (i = 0; i < 56; i = i + 1)
+            send_byte(8'h42, (i == 55));
+
+        // Block 1 - not last
+        wait(block_valid == 1'b1);
+        @(posedge clk); #1;
+        block_num = block_num + 1;
+        display_block(block_out, last_block);
+
+        if (block_out[511:480] == 32'h42424242 && last_block == 0) begin
+            $display("PASS | 56-byte block 1");
+            pass_count = pass_count + 1;
+        end else begin
+            $display("FAIL | 56-byte block 1");
+            fail_count = fail_count + 1;
+        end
+
+        // Block 2 - zeros + length, last
+        // W[0] = 00000000, W[15] = 000001C0
+        check_block(32'h00000000, 32'h000001C0, 1'b1, "56-byte block 2");
+
+        #30;
+
+        // TEST 5: 64 bytes of 0x43 ('C') - 2 blocks
+        // 64 bytes = 512 bits = 0x200
+        // Block 1: all message, not last
+        // Block 2: 0x80 + zeros + length
+        $display("\n--- TEST 5: 64 bytes (2 blocks) ---");
+        for (i = 0; i < 64; i = i + 1)
+            send_byte(8'h43, (i == 63));
+
+        // Block 1 - full message, not last
+        wait(block_valid == 1'b1);
+        @(posedge clk); #1;
+        block_num = block_num + 1;
+        display_block(block_out, last_block);
+
+        if (block_out[511:480] == 32'h43434343 && last_block == 0) begin
+            $display("PASS | 64-byte block 1");
+            pass_count = pass_count + 1;
+        end else begin
+            $display("FAIL | 64-byte block 1");
+            fail_count = fail_count + 1;
+        end
+
+        // Block 2 - 0x80 at start
+        // W[0] = 80000000, W[15] = 00000200
+        check_block(32'h80000000, 32'h00000200, 1'b1, "64-byte block 2");
+
+        #30;
+
+        // TEST 6: 128 bytes of 0x44 ('D') - 3 blocks
+        // 128 bytes = 1024 bits = 0x400
+        // Block 1 & 2: message, not last
+        // Block 3: 0x80 + zeros + length
+        $display("\n--- TEST 6: 128 bytes (3 blocks) ---");
+        for (i = 0; i < 128; i = i + 1)
+            send_byte(8'h44, (i == 127));
+
+        // Block 1
+        wait(block_valid == 1'b1);
+        @(posedge clk); #1;
+        block_num = block_num + 1;
+        display_block(block_out, last_block);
+
+        if (block_out[511:480] == 32'h44444444 && last_block == 0) begin
+            $display("PASS | 128-byte block 1");
+            pass_count = pass_count + 1;
+        end else begin
+            $display("FAIL | 128-byte block 1");
+            fail_count = fail_count + 1;
+        end
+
+        // Block 2
+        wait(block_valid == 1'b1);
+        @(posedge clk); #1;
+        block_num = block_num + 1;
+        display_block(block_out, last_block);
+
+        if (block_out[511:480] == 32'h44444444 && last_block == 0) begin
+            $display("PASS | 128-byte block 2");
+            pass_count = pass_count + 1;
+        end else begin
+            $display("FAIL | 128-byte block 2");
+            fail_count = fail_count + 1;
+        end
+
+        // Block 3 - padding
+        // W[0] = 80000000, W[15] = 00000400
+        check_block(32'h80000000, 32'h00000400, 1'b1, "128-byte block 3");
+
+        // FINAL RESULT
+        #50;
+        $display("     FINAL RESULT");
+        $display("     %0d PASSED   %0d FAILED", pass_count, fail_count);
+        if (fail_count == 0)
+            $display("     All tests PASSED. Ready for expander.");
+        else
+            $display("     Fix failures before connecting to expander.");
+
+        $finish;
+    end
+
+endmodule
