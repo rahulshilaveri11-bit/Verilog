@@ -1,0 +1,217 @@
+module axi_top_ram_tb;
+
+    // Parameters
+    parameter DATA_WIDTH  = 32;
+    parameter ADDR_WIDTH  = 16;
+    parameter DEPTH       = 1024;
+    parameter CLOCK_PERIOD = 10;
+
+    // Clock and Reset
+    reg aclk;
+    reg arstn;
+
+    // Write Address Channel
+    reg  [ADDR_WIDTH-1:0] s_axi_awaddr;
+    reg  s_axi_awvalid;
+    wire s_axi_awready;
+
+    // Write Data Channel
+    reg  [DATA_WIDTH-1:0] s_axi_wdata;
+    reg  [DATA_WIDTH/8-1:0] s_axi_wstrb;
+    reg  s_axi_wvalid;
+    wire s_axi_wready;
+
+    // Write Response Channel
+    wire [1:0] s_axi_bresp;
+    wire  s_axi_bvalid;
+    reg   s_axi_bready;
+
+    // Read Address Channel
+    reg  [ADDR_WIDTH-1:0] s_axi_araddr;
+    reg  s_axi_arvalid;
+    wire s_axi_arready;
+
+    // Read Data Channel
+    wire [DATA_WIDTH-1:0] s_axi_rdata;
+    wire [1:0] s_axi_rresp;
+    wire s_axi_rvalid;
+    reg  s_axi_rready;
+
+    // Test variable
+    reg [31:0] rdata;
+
+    // DUT Instantiation (AXI4-Lite - no ID, LEN, SIZE, BURST, LAST signals)
+    axi_top_ram #(
+        .data_width (DATA_WIDTH),
+        .addr_width (ADDR_WIDTH),
+        .depth      (DEPTH)
+    ) dut (
+        .aclk         (aclk),
+        .arstn        (arstn),
+        .s_axi_awaddr (s_axi_awaddr),
+        .s_axi_awvalid(s_axi_awvalid),
+        .s_axi_awready(s_axi_awready),
+        .s_axi_wdata  (s_axi_wdata),
+        .s_axi_wstrb  (s_axi_wstrb),
+        .s_axi_wvalid (s_axi_wvalid),
+        .s_axi_wready (s_axi_wready),
+        .s_axi_bresp  (s_axi_bresp),
+        .s_axi_bvalid (s_axi_bvalid),
+        .s_axi_bready (s_axi_bready),
+        .s_axi_araddr (s_axi_araddr),
+        .s_axi_arvalid(s_axi_arvalid),
+        .s_axi_arready(s_axi_arready),
+        .s_axi_rdata  (s_axi_rdata),
+        .s_axi_rresp  (s_axi_rresp),
+        .s_axi_rvalid (s_axi_rvalid),
+        .s_axi_rready (s_axi_rready)
+    );
+
+    // Clock Generation
+    initial begin
+        aclk = 0;
+        forever #(CLOCK_PERIOD/2) aclk = ~aclk;
+    end
+
+    // Reset and Test Sequence
+    initial begin
+        // Initialize all signals
+        arstn         = 0;
+        s_axi_awaddr  = 0;
+        s_axi_awvalid = 0;
+        s_axi_wdata   = 0;
+        s_axi_wstrb   = 4'hF;
+        s_axi_wvalid  = 0;
+        s_axi_bready  = 0;
+        s_axi_araddr  = 0;
+        s_axi_arvalid = 0;
+        s_axi_rready  = 0;
+
+        // Reset
+        repeat (5) @(posedge aclk);
+        arstn = 1;
+        repeat (2) @(posedge aclk);
+
+        // Test 1: Write then Read
+        $display("=== Test 1: Write 0xDEADBEEF to addr 0x004 ===");
+        write_axi(16'h0004, 32'hDEADBEEF);
+        read_axi(16'h0004, rdata);
+
+        if (rdata !== 32'hDEADBEEF)
+            $error("TEST 1 FAILED: Expected 0xDEADBEEF, got 0x%08X", rdata);
+        else
+            $display("TEST 1 PASSED: Read 0x%08X", rdata);
+
+        // Test 2: Write then Read different address
+        $display("=== Test 2: Write 0x12345678 to addr 0x008 ===");
+        write_axi(16'h0008, 32'h12345678);
+        read_axi(16'h0008, rdata);
+
+        if (rdata !== 32'h12345678)
+            $error("TEST 2 FAILED: Expected 0x12345678, got 0x%08X", rdata);
+        else
+            $display("TEST 2 PASSED: Read 0x%08X", rdata);
+
+        // Test 3: Read from unwritten address (should be 0)
+        $display("=== Test 3: Read from addr 0x00C (uninitialized) ===");
+        read_axi(16'h000C, rdata);
+        $display("Read 0x%08X from addr 0x00C", rdata);
+
+        // Test 4: Back-to-back writes
+        $display("=== Test 4: Back-to-back writes ===");
+        write_axi(16'h0010, 32'hAABBCCDD);
+        write_axi(16'h0014, 32'h11223344);
+        read_axi(16'h0010, rdata);
+        if (rdata !== 32'hAABBCCDD)
+            $error("TEST 4a FAILED: Expected 0xAABBCCDD, got 0x%08X", rdata);
+        else
+            $display("TEST 4a PASSED: Read 0x%08X", rdata);
+        read_axi(16'h0014, rdata);
+        if (rdata !== 32'h11223344)
+            $error("TEST 4b FAILED: Expected 0x11223344, got 0x%08X", rdata);
+        else
+            $display("TEST 4b PASSED: Read 0x%08X", rdata);
+
+        #50;
+        $display("=== ALL TESTS COMPLETED ===");
+        $finish;
+    end
+
+    // AXI4-Lite Write Task (Fixed handshake sequencing)
+    task write_axi(
+        input [ADDR_WIDTH-1:0] addr,
+        input [DATA_WIDTH-1:0] data
+    );
+        begin
+            // Phase 1: Write Address - assert awvalid and wait for handshake
+            @(posedge aclk);
+            s_axi_awaddr  <= addr;
+            s_axi_awvalid <= 1'b1;
+
+            // Wait for awready handshake on a clock edge
+            @(posedge aclk);
+            while (!(s_axi_awready && s_axi_awvalid)) @(posedge aclk);
+            s_axi_awvalid <= 1'b0;
+
+            // Phase 2: Write Data - assert wvalid and wait for handshake
+            @(posedge aclk);
+            s_axi_wdata  <= data;
+            s_axi_wstrb  <= 4'hF;     // All bytes valid
+            s_axi_wvalid <= 1'b1;
+
+            // Wait for wready handshake on a clock edge
+            @(posedge aclk);
+            while (!(s_axi_wready && s_axi_wvalid)) @(posedge aclk);
+            s_axi_wvalid <= 1'b0;
+
+            // Phase 3: Write Response - assert bready and wait for bvalid
+            @(posedge aclk);
+            s_axi_bready <= 1'b1;
+
+            // Wait for bvalid handshake on a clock edge
+            @(posedge aclk);
+            while (!(s_axi_bvalid && s_axi_bready)) @(posedge aclk);
+            s_axi_bready <= 1'b0;
+
+            $display("  WRITE: addr=0x%04X, data=0x%08X, resp=%b", addr, data, s_axi_bresp);
+        end
+    endtask
+
+    // AXI4-Lite Read Task (Fixed data capture timing)
+    task read_axi(
+        input  [ADDR_WIDTH-1:0] addr,
+        output [DATA_WIDTH-1:0] data
+    );
+        begin
+            // Phase 1: Read Address - assert arvalid and wait for handshake
+            @(posedge aclk);
+            s_axi_araddr  <= addr;
+            s_axi_arvalid <= 1'b1;
+
+            // Wait for arready handshake on a clock edge
+            @(posedge aclk);
+            while (!(s_axi_arready && s_axi_arvalid)) @(posedge aclk);
+            s_axi_arvalid <= 1'b0;
+
+            // Phase 2: Read Data - assert rready and wait for rvalid
+            @(posedge aclk);
+            s_axi_rready <= 1'b1;
+
+            // Wait for rvalid handshake on a clock edge
+            @(posedge aclk);
+            while (!(s_axi_rvalid && s_axi_rready)) @(posedge aclk);
+            data = s_axi_rdata;       // Capture data after handshake is confirmed
+            s_axi_rready <= 1'b0;
+
+            $display("  READ:  addr=0x%04X, data=0x%08X, resp=%b", addr, data, s_axi_rresp);
+        end
+    endtask
+
+    // Timeout watchdog
+    initial begin
+        #10000;
+        $error("TIMEOUT: Simulation hung");
+        $finish;
+    end
+
+endmodule
