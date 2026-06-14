@@ -1,0 +1,35 @@
+module FIFO_8x8_tb(
+
+    );
+    reg clk,rst,write_enb,read_enb;
+    reg [7:0] data_in;
+   
+    wire [7:0] data_out;
+    
+    FIFO_8x8 dut(clk,rst,write_enb,read_enb,data_in,data_out,full,empty);
+    
+    initial begin
+        {clk,rst,write_enb,read_enb,data_in} = 0;
+      end
+    
+    always #5 clk = ~clk;
+    
+    initial begin
+        rst = 1;
+        #10
+        rst = 0;
+        write_enb = 1;
+        data_in = 3;
+        #10;
+        write_enb = 1;
+        data_in =  9;
+        #10;
+        write_enb = 0;
+        #10;
+        read_enb = 9;
+     
+        #20;
+        $finish;
+        end
+        
+endmodule
