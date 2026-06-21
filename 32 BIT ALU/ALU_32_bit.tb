@@ -1,0 +1,31 @@
+module ALU_b2_bit_tb(
+
+    );
+    reg [31:0] a, b;
+    reg [2:0] opcodes;
+    wire [31:0] y;
+    
+    ALU_32_bit dut(a,b,opcodes,y);
+    
+    initial begin
+      {a,b,opcodes} = 0 ;
+      end
+      
+      initial begin
+         opcodes = 3'b000; a = 32'b1111;b = 32'b1011;
+         #10; 
+         opcodes = 3'b001;
+         #10;
+         opcodes = 3'b010;
+         #10;
+         opcodes = 3'b011;
+         #10;
+         opcodes = 3'b100;
+         #10;
+         opcodes = 3'b101;
+         #10;
+         opcodes = 3'b110;
+         #10;
+         opcodes = 3'b111;
+         end
+endmodule
