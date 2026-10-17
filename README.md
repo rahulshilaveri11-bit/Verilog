@@ -23,11 +23,18 @@ My focus is on digital logic, sequential circuits, finite state machines, and ha
 - Functional simulation
 - Arithmetic optimization techniques
 
-## Tools
+## 🧰 Tools
 
-- AMD Vivado / ModelSim / Icarus Verilog *(update with tools you actually used)*
-- GTKWave
-- Git and GitHub
+| Tool                  | Purpose                          |
+|-----------------------|----------------------------------|
+| **Icarus Verilog**    | Simulation                       |
+| **GTKWave**           | Waveform viewing                 |
+| **ModelSim / QuestaSim** | Simulation + Debugging        |
+| **AMD Vivado**        | Simulation + Synthesis (FPGA)    |
+| **EDA Playground**    | Online simulation                |
+| **Git & GitHub**      | Version control                  |
+
+---
 
 ## Verification
 
@@ -38,4 +45,4 @@ Each design includes a dedicated testbench. Functional simulation has been perfo
 This repository represents my continued development in digital design and RTL engineering, with an emphasis on readable code, functional correctness, and practical hardware implementation.
 
 **Author:** Rahul Shilaveri  
-[LinkedIn](your-linkedin-link) | [Email](your-email)
+| [Email](rahulshilaveri007@gmail.com)
