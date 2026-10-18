@@ -3,7 +3,7 @@ input clk,rst,start,last_block,
 input [31:0] Wt,
 output reg [255:0] hash_out,
 output reg hash_valid
-    );
+);
     
     `include "sha_256_functions.vh"
     
