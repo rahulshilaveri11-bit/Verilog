@@ -6,13 +6,14 @@ My focus is on digital logic, sequential circuits, finite state machines, and ha
 
 ## Featured Projects
 
-| Project              | Description                                                                 | Source                          |
-|----------------------|-----------------------------------------------------------------------------|---------------------------------|
-| **32-bit ALU**       | Parameterized 32-bit Arithmetic Logic Unit with arithmetic, logical, shift, and comparison operations, including status flags (Zero, Negative, Carry, Overflow) | [View source]([src/alu_32bit/](https://github.com/rahulshilaveri11-bit/Verilog/tree/main/32%20BIT%20ALU)   |
-| **SHA-256**          | Hardware implementation of the SHA-256 cryptographic hash algorithm including message padding, expander, compressor, and carry-skip adder | [View source]([src/sha256/](https://github.com/rahulshilaveri11-bit/Verilog/tree/main/SHA)      |
-| **Synchronous FIFO** | 8×8 Synchronous FIFO with full and empty status flags                       | [View source]([src/fifo/](https://github.com/rahulshilaveri11-bit/Verilog/tree/main/FIFO)        |
-| **AXI Interface**    | AXI protocol related modules and associated RAM design                      | [View source]([src/axi/](https://github.com/rahulshilaveri11-bit/Verilog/tree/main/AXI)         |
-    
+| Project                  | Description                                                                                                                                                     | Source                                                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **32-bit ALU**           | Parameterized 32-bit Arithmetic Logic Unit with arithmetic, logical, shift, and comparison operations, including status flags (Zero, Negative, Carry, Overflow) | [View source](https://github.com/rahulshilaveri11-bit/Verilog/tree/main/32%20BIT%20ALU)                 |
+| **SHA-256**              | Hardware implementation of the SHA-256 cryptographic hash algorithm including message padding, expander, compressor, and carry-skip adder                       | [View source](https://github.com/rahulshilaveri11-bit/Verilog/tree/main/SHA)                             |
+| **Synchronous FIFO**     | 8×8 Synchronous FIFO with full and empty status flags                                                                                                           | [View source](https://github.com/rahulshilaveri11-bit/Verilog/tree/main/FIFO)                            |
+| **Asynchronous FIFO**    | Parameterized dual-clock Asynchronous FIFO (default 8-bit × 16 depth) with Gray-coded pointers for safe CDC, full and empty status flags                        | [View source](https://github.com/rahulshilaveri11-bit/Verilog/tree/main/asynchronous_fifo)               |
+| **AXI Interface**        | AXI protocol related modules and associated RAM design                                                                                                          | [View source](https://github.com/rahulshilaveri11-bit/Verilog/tree/main/AXI)                              |
+
 ## Technical Skills
 
 - Verilog HDL
@@ -25,14 +26,14 @@ My focus is on digital logic, sequential circuits, finite state machines, and ha
 
 ## 🧰 Tools
 
-| Tool                  | Purpose                          |
-|-----------------------|----------------------------------|
-| **Icarus Verilog**    | Simulation                       |
-| **GTKWave**           | Waveform viewing                 |
+| Tool                     | Purpose                       |
+| ------------------------ | ----------------------------- |
+| **Icarus Verilog**       | Simulation                    |
+| **GTKWave**              | Waveform viewing              |
 | **ModelSim / QuestaSim** | Simulation + Debugging        |
-| **AMD Vivado**        | Simulation + Synthesis (FPGA)    |
-| **EDA Playground**    | Online simulation                |
-| **Git & GitHub**      | Version control                  |
+| **AMD Vivado**           | Simulation + Synthesis (FPGA) |
+| **EDA Playground**       | Online simulation             |
+| **Git & GitHub**         | Version control               |
 
 ---
 
@@ -45,4 +46,4 @@ Each design includes a dedicated testbench. Functional simulation has been perfo
 This repository represents my continued development in digital design and RTL engineering, with an emphasis on readable code, functional correctness, and practical hardware implementation.
 
 **Author:** Rahul Shilaveri  
-| [Email](rahulshilaveri007@gmail.com)
+[Email](mailto:rahulshilaveri007@gmail.com)
