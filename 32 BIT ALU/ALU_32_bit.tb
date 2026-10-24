@@ -1,0 +1,49 @@
+module ALU_b2_bit_tb(
+
+    );
+    parameter WIDTH = 32;
+    reg [31:0] A,B;
+    reg [3:0] alu_ctr;
+    reg enb;
+    wire [31:0] result;
+    wire zero,overflow,carry,negative;
+    
+    ALU_32_bit #(.WIDTH(WIDTH)) dut(.A(A),.B(B),.enb(enb),.alu_ctr(alu_ctr),
+                   .result(result),.zero(zero),.overflow(overflow),
+                   .carry(carry),.negative(negative));
+                   
+    initial begin
+    
+      //initialize
+      A = {WIDTH{1'b0}};
+      B = {WIDTH{1'b0}};
+      alu_ctr = 4'b0000;
+      enb = 0;
+      #10;
+      enb = 1;
+      #10;
+      alu_ctr = 4'b0000; A = 32'b1111; B = 32'b1010;
+      #10;
+      alu_ctr = 4'b0001;
+      #10
+      alu_ctr = 4'b0010;
+      #10;
+      alu_ctr = 4'b0011;
+      #10;
+      alu_ctr = 4'b0100;
+      #10;
+      alu_ctr = 4'b0101;
+      #10;
+      alu_ctr = 4'b0110;
+      #10;
+      alu_ctr = 4'b0111;
+      #10;
+      alu_ctr = 4'b1000;
+      #10;
+      alu_ctr = 4'b1001;
+      #10;
+      alu_ctr = 4'b1010;
+      #10;               
+      alu_ctr = 4'b1011;
+      end
+endmodule

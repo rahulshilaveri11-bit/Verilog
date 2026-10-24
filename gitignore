@@ -1,0 +1,28 @@
+# Simulation / Tool outputs
+*.vcd
+*.fsdb
+*.wlf
+*.log
+*.jou
+*.pb
+*.xpr
+*.xdc
+*.bit
+*.bin
+*.mcs
+*.prm
+xsim.dir/
+.Xil/
+__pycache__/
+*.pyc
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Temporary files
+*.tmp
+*.bak

@@ -1,0 +1,35 @@
+module async_fifo_tb;
+   reg wr_clk= 0, rd_clk=0;
+   reg wr_enb=0,rd_enb=0;
+   reg rst = 1;
+   wire full,empty;
+   reg [7:0] din;
+   wire [7:0] dout;
+   
+   async_fifo dut(.wr_clk(wr_clk),.rd_clk(rd_clk),.wr_enb(wr_enb),.rd_enb(rd_enb),.rst_n(rst),.din(din),.dout(dout),.full(full),.empty(empty));
+   always #5 wr_clk = ~wr_clk;
+   always #7 rd_clk = ~rd_clk;
+   
+   initial begin
+   #20 rst = 0;
+   
+   repeat (10) begin
+   @(posedge wr_clk);
+   wr_enb = 1;
+   din = $random;
+   end
+   wr_enb = 0;
+   
+   #100;
+   
+   repeat(10) begin
+   @(posedge rd_clk);
+   rd_enb = 1;
+   end
+   rd_enb = 0;
+   
+   #200 $finish;
+   
+   end
+   
+endmodule

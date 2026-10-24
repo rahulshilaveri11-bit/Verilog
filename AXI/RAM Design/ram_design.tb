@@ -1,0 +1,80 @@
+module ram_design_tb(
+
+    );
+    parameter addr_width = 4;
+    parameter data_width = 32;
+    parameter depth = 16;
+    
+    reg clk,rst_n,write_enb;
+    reg [addr_width - 1 : 0] addr;
+    reg [data_width - 1 : 0] wdata;
+    reg [data_width/8 - 1 : 0] wstrb;
+    wire [data_width - 1 : 0] rdata;
+    
+    //Instansiating the ram
+    ram_design #(.ADDR_WIDTH(addr_width),.DATA_WIDTH(data_width),.DEPTH(depth))
+               RAM (.clk(clk),.rst_n(rst_n),.write_enb(write_enb),.addr(addr),.wdata(wdata),.wstrb(wstrb),.rdata(rdata));
+      initial begin
+         clk = 0;
+         end
+      always #5 clk = ~clk;
+               
+      //Task write the data on a sepcific location
+      task write_data( input [addr_width -1 : 0] address,input [data_width - 1: 0] data);
+      begin
+         @(posedge clk);
+         write_enb = 1'b1;
+         addr = address;
+         wdata = data;
+         wstrb = 4'hF;  // all bytes enabled
+         $display("Time=%0t [WRITE] Addr=0x%0h | Data=0x%0h", $time, address, data);
+         @(posedge clk);  // wait for write to be captured
+         write_enb = 1'b0;  // deassert write enable
+      end
+      endtask
+      
+      //Read data from the specific address
+      task read_data(input [addr_width - 1 : 0] address);
+      begin
+         @(posedge clk);
+         write_enb = 1'b0;
+         addr = address;
+         @(posedge clk); // Wait one cycle for registered read
+         #1; // Small delay to allow rdata to settle
+         $display("Time=%0t [READ]  Addr=0x%0h | Data=0x%0h", $time, address, rdata);
+       end
+       endtask  
+         //Test sequnece
+         initial 
+          begin
+            rst_n = 1;
+            write_enb = 0;
+            addr = 0;
+            wdata = 0;
+            
+            //Apply reset
+            @(posedge clk);
+            rst_n = 0;
+            @(posedge clk);
+            @(posedge clk);
+            rst_n = 1'b1;
+            
+            
+            
+            $display("teest 1 ");
+            write_data (4'h5,32'hAAAA_CACA);
+            read_data (4'h5);
+            
+            $display("test 2 ");
+            write_data (4'h7,32'h0000_0000);
+            read_data(4'h7);
+            
+            $display("test 3");
+            read_data(4'h8);
+            
+            $display("\n=== Simulation Complete ===");
+            #20;
+            $finish;
+            end
+                
+endmodule
